@@ -423,3 +423,76 @@ def test_validate_meta_astropy_header():
     header = hdulist[0].header
     hdulist.close()
     assert sunpy.timeseries.TimeSeries._is_metadata(header)
+
+
+def test_from_spacedata_simple():
+    # Load from a SpacePy SpaceData, simple case
+    import spacepy
+    # Cut-down data from psp_fld_l2_mag_SC_1min_20200801_v02.cdf
+    sd = spacepy.SpaceData({
+        'component_index_SC': spacepy.dmarray(
+            [1, 2, 3],
+            attrs={'CATDESC': 'Numerical index for B components in SC coordinates',
+                   'FIELDNAM': 'Numerical index for B components in SC coordinates',
+                   'FORMAT': 'I10',
+                   'UNITS': ' ',
+                   'VAR_TYPE': 'metadata'}),
+        'epoch_mag_SC_1min': spacepy.dmarray(
+            [datetime.datetime(2020, 8, 1, 0, i, 30) for i in range(10)],
+            attrs={'CATDESC': 'Time in TT2000 for 1 minute cadence MAG waveform data',
+                   'FIELDNAM': 'epoch_mag_SC_1min',
+                   'FILLVAL': datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
+                   'FORMAT': 'I22',
+                   'LABLAXIS': 'Epoch',
+                   'MONOTON': 'INCREASE',
+                   'REFERENCE_POSITION': 'Rotating Earth Geoid',
+                   'SCALEMAX': datetime.datetime(2020, 8, 2, 0, 0),
+                   'SCALEMIN': datetime.datetime(2020, 8, 1, 0, 0),
+                   'SCALETYP': 'linear',
+                   'TIME_BASE': 'J2000',
+                   'TIME_SCALE': 'Terrestrial Time',
+                   'UNITS': 'ns',
+                   'VALIDMAX': datetime.datetime(2050, 1, 1, 0, 0),
+                   'VALIDMIN': datetime.datetime(2010, 1, 1, 0, 0),
+                   'VAR_TYPE': 'support_data'}),
+        'label_SC': spacepy.dmarray(
+            ['B_X', 'B_Y', 'B_Z'],
+            attrs={'CATDESC': 'Labels for B in SC coordinates',
+                   'FIELDNAM': 'Labels for B in SC coordinates',
+                   'FORMAT': 'A3',
+                   'UNITS': ' ',
+                   'VAR_TYPE': 'metadata'}),
+        'psp_fld_l2_mag_SC_1min': spacepy.dmarray(
+            [[-1.33298862, -0.66052639, -5.67735291],
+             [-1.25600016, -0.58395237, -5.71422005],
+             [-1.22114432, -0.66933227, -5.74187565],
+             [-1.21677554, -0.60025686, -5.72364283],
+             [-1.36630678, -0.67579347, -5.65783787],
+             [-1.37418807, -0.83480269, -5.58627987],
+             [-1.57593489, -1.07226455, -5.50156879],
+             [-1.39815068, -0.91507798, -5.7775774 ],
+             [-1.3908149 , -0.9443835 , -5.76820612],
+             [-1.5247916 , -1.07128477, -5.81145239]],
+            attrs={'CATDESC': 'Magnetic field in SC coordinates (1 minute cadence)',
+                   'DEPEND_0': 'epoch_mag_SC_1min',
+                   'DEPEND_1': 'component_index_SC',
+                   'DISPLAY_TYPE': 'time_series',
+                   'FIELDNAM': 'MAG B_SC',
+                   'FILLVAL': -1e+31,
+                   'FORMAT': 'E12.2',
+                   'LABLAXIS': 'B_SC',
+                   'LABL_PTR_1': 'label_SC',
+                   'SCALETYP': 'linear',
+                   'SI_conv': '1.0e-9>Tesla',
+                   'UNITS': 'nT',
+                   'VALIDMAX': np.array([ 65536.,  65536.,  65536.]),
+                   'VALIDMIN': np.array([-65536., -65536., -65536.]),
+                   'VAR_TYPE': 'data'})
+        })
+    ts = sunpy.timeseries.TimeSeries(sd)
+    assert sorted(ts.units.keys()) == ['B_X', 'B_Y', 'B_Z']
+    assert str(list(ts.units.values())[0]) == 'nT'
+    assert ts.meta.columns == ['B_X', 'B_Y', 'B_Z']
+    assert (ts.to_array() == sd['psp_fld_l2_mag_SC_1min']).all()
+    assert (ts.time.iso == [dt.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                            for dt in sd['epoch_mag_SC_1min']]).all()

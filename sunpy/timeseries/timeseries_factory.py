@@ -2,6 +2,7 @@
 This module provies the `~sunpy.timeseries.TimeSeriesFactory` class.
 """
 import os
+import collections.abc
 import copy
 import pathlib
 from collections import OrderedDict
@@ -404,6 +405,24 @@ class TimeSeriesFactory(BasicRegistrationFactory):
             meta = sunpy.io.header.FileHeader(meta)
         meta = MetaDict(meta)
         return [self._check_registered_widgets(data=data, meta=meta, units=units, **kwargs)]
+
+    @_parse_arg.register(collections.abc.Mapping)
+    def _parse_SpaceData(self, sd, **kwargs):
+        main_vars = sd.main_vars()
+        if len(main_vars) != 1:
+            raise NoMatchError("Could not identify a unique valid array in SpaceData.")
+        k = main_vars[0]
+        a = sd[k].attrs  # Convenience
+        data = pd.DataFrame(
+            data=sd[k][...],
+            index=sd[a['DEPEND_0']][...],
+            columns=sd[a['LABL_PTR_1']][...],
+            copy=True,  # Editing data in TimeSeries will change dmarray!
+        )
+        units = u.Unit(a['UNITS'], parse_strict='silent')
+        if isinstance(units, u.UnrecognizedUnit):
+            units = a['UNITS']
+        return [GenericTimeSeries(data=data, units={l: units for l in data.columns})]
 
     def __call__(self, *args, silence_errors=False, **kwargs):
         """
